@@ -1,0 +1,37 @@
+services:
+  whatsgo:
+    build: .
+    ports:
+      - "8550:8550"
+    environment:
+      WHATSGO_CONFIG: /etc/whatsgo/whatsgo.yaml
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: whatsgo
+      WHATSGO_API_KEY: change-me-to-a-secure-key-at-least-16-chars
+    volumes:
+      - ./whatsgo.yaml:/etc/whatsgo/whatsgo.yaml:ro
+      - whatsgo-data:/home/whatsgo/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: whatsgo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  whatsgo-data:
+  postgres-data:

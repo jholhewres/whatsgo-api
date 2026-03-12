@@ -1,0 +1,33 @@
+server:
+  host: "0.0.0.0"
+  port: 8550
+  base_url: "http://localhost:8550"
+
+database:
+  backend: "postgresql"
+  postgresql:
+    host: "${POSTGRES_HOST:localhost}"
+    port: 5432
+    user: "${POSTGRES_USER:postgres}"
+    password: "${POSTGRES_PASSWORD:postgres}"
+    dbname: "${POSTGRES_DB:whatsgo}"
+    sslmode: "disable"
+    max_conns: 50
+    min_conns: 10
+  sqlite:
+    path: "./data/whatsgo.db"
+
+auth:
+  global_api_key: "${WHATSGO_API_KEY}"
+
+whatsapp:
+  session_db_path: "./data/sessions.db"
+
+webhook:
+  global_url: ""
+  global_events: []
+  global_headers: {}
+
+logging:
+  level: "info"
+  format: "text"

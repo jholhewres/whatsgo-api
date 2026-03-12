@@ -1,0 +1,21 @@
+whatsgo
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+
+# Frontend
+web/node_modules/
+web/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
