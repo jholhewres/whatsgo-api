@@ -29,7 +29,7 @@ type Server struct {
 func New(cfg *config.Config, db store.Store, logger *slog.Logger) (*Server, error) {
 	mux := http.NewServeMux()
 
-	authMw := auth.NewMiddleware(db, cfg.Auth.GlobalAPIKey, logger)
+	authMw := auth.NewMiddlewareWithTTL(db, cfg.Auth.GlobalAPIKey, logger, time.Duration(cfg.Auth.CacheTTL)*time.Second)
 
 	// Create webhook dispatcher
 	dispatcher := webhook.NewDispatcher(db, cfg.Webhook, logger)
@@ -60,21 +60,22 @@ func New(cfg *config.Config, db store.Store, logger *slog.Logger) (*Server, erro
 	// Serve embedded frontend (SPA fallback)
 	mux.Handle("/", webui.Handler())
 
-	// Middleware chain
+	// Middleware chain (outermost runs first)
 	var handler http.Handler = mux
 	handler = securityHeadersMiddleware(handler)
 	handler = corsMiddleware(cfg.Server.BaseURL)(handler)
 	handler = recoveryMiddleware(logger, handler)
 	handler = loggingMiddleware(logger, handler)
+	handler = requestIDMiddleware(handler)
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      handler,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 60 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		ReadTimeout:  time.Duration(cfg.Server.ReadTimeout) * time.Second,
+		WriteTimeout: time.Duration(cfg.Server.WriteTimeout) * time.Second,
+		IdleTimeout:  time.Duration(cfg.Server.IdleTimeout) * time.Second,
 	}
 
 	return &Server{

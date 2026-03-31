@@ -10,26 +10,26 @@ func (h *Handlers) HandleCheckNumber(w http.ResponseWriter, r *http.Request) {
 	inst := auth.GetInstance(r.Context())
 
 	var req CheckNumberRequest
-	if err := readJSON(r, &req); err != nil || len(req.Numbers) == 0 {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "numbers array is required"})
+	if err := readJSON(w, r, &req); err != nil || len(req.Numbers) == 0 {
+		writeBadRequest(w, "numbers array is required")
 		return
 	}
 
 	waInst, ok := h.manager.Get(inst.Name)
 	if !ok {
-		writeJSON(w, http.StatusServiceUnavailable, ErrorResponse{Error: "instance not connected"})
+		writeNotConnected(w)
 		return
 	}
 
 	results, err := waInst.CheckNumbers(r.Context(), req.Numbers)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		h.writeInternalError(w, r, "failed to check numbers", err)
 		return
 	}
 
 	checks := make([]NumberCheck, len(results))
-	for idx, r := range results {
-		checks[idx] = NumberCheck{Number: r.Number, Exists: r.Exists, JID: r.JID}
+	for idx, res := range results {
+		checks[idx] = NumberCheck{Number: res.Number, Exists: res.Exists, JID: res.JID}
 	}
 	writeJSON(w, http.StatusOK, CheckNumberResponse{Results: checks})
 }
@@ -38,19 +38,19 @@ func (h *Handlers) HandleMarkRead(w http.ResponseWriter, r *http.Request) {
 	inst := auth.GetInstance(r.Context())
 
 	var req MarkReadRequest
-	if err := readJSON(r, &req); err != nil || req.ChatJID == "" || len(req.MessageIDs) == 0 {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "chat_jid and message_ids are required"})
+	if err := readJSON(w, r, &req); err != nil || req.ChatJID == "" || len(req.MessageIDs) == 0 {
+		writeBadRequest(w, "chat_jid and message_ids are required")
 		return
 	}
 
 	waInst, ok := h.manager.Get(inst.Name)
 	if !ok {
-		writeJSON(w, http.StatusServiceUnavailable, ErrorResponse{Error: "instance not connected"})
+		writeNotConnected(w)
 		return
 	}
 
 	if err := waInst.MarkRead(r.Context(), req.ChatJID, req.MessageIDs); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		h.writeInternalError(w, r, "failed to mark messages as read", err)
 		return
 	}
 
@@ -61,19 +61,19 @@ func (h *Handlers) HandleDeleteMessage(w http.ResponseWriter, r *http.Request) {
 	inst := auth.GetInstance(r.Context())
 
 	var req DeleteMessageRequest
-	if err := readJSON(r, &req); err != nil || req.ChatJID == "" || req.MessageID == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "chat_jid and message_id are required"})
+	if err := readJSON(w, r, &req); err != nil || req.ChatJID == "" || req.MessageID == "" {
+		writeBadRequest(w, "chat_jid and message_id are required")
 		return
 	}
 
 	waInst, ok := h.manager.Get(inst.Name)
 	if !ok {
-		writeJSON(w, http.StatusServiceUnavailable, ErrorResponse{Error: "instance not connected"})
+		writeNotConnected(w)
 		return
 	}
 
 	if err := waInst.RevokeMessage(r.Context(), req.ChatJID, req.MessageID); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		h.writeInternalError(w, r, "failed to delete message", err)
 		return
 	}
 
@@ -84,20 +84,20 @@ func (h *Handlers) HandleEditMessage(w http.ResponseWriter, r *http.Request) {
 	inst := auth.GetInstance(r.Context())
 
 	var req EditMessageRequest
-	if err := readJSON(r, &req); err != nil || req.ChatJID == "" || req.MessageID == "" || req.Text == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "chat_jid, message_id, and text are required"})
+	if err := readJSON(w, r, &req); err != nil || req.ChatJID == "" || req.MessageID == "" || req.Text == "" {
+		writeBadRequest(w, "chat_jid, message_id, and text are required")
 		return
 	}
 
 	waInst, ok := h.manager.Get(inst.Name)
 	if !ok {
-		writeJSON(w, http.StatusServiceUnavailable, ErrorResponse{Error: "instance not connected"})
+		writeNotConnected(w)
 		return
 	}
 
 	resp, err := waInst.EditMessage(r.Context(), req.ChatJID, req.MessageID, req.Text)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		h.writeInternalError(w, r, "failed to edit message", err)
 		return
 	}
 
@@ -112,26 +112,26 @@ func (h *Handlers) HandleSendPresence(w http.ResponseWriter, r *http.Request) {
 	inst := auth.GetInstance(r.Context())
 
 	var req SendPresenceRequest
-	if err := readJSON(r, &req); err != nil || req.ChatJID == "" || req.Presence == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "chat_jid and presence are required"})
+	if err := readJSON(w, r, &req); err != nil || req.ChatJID == "" || req.Presence == "" {
+		writeBadRequest(w, "chat_jid and presence are required")
 		return
 	}
 
 	switch req.Presence {
 	case "composing", "paused", "recording":
 	default:
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "presence must be one of: composing, paused, recording"})
+		writeBadRequest(w, "presence must be one of: composing, paused, recording")
 		return
 	}
 
 	waInst, ok := h.manager.Get(inst.Name)
 	if !ok {
-		writeJSON(w, http.StatusServiceUnavailable, ErrorResponse{Error: "instance not connected"})
+		writeNotConnected(w)
 		return
 	}
 
 	if err := waInst.SendChatPresence(r.Context(), req.ChatJID, req.Presence); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		h.writeInternalError(w, r, "failed to send presence", err)
 		return
 	}
 
@@ -142,24 +142,24 @@ func (h *Handlers) HandleBlock(w http.ResponseWriter, r *http.Request) {
 	inst := auth.GetInstance(r.Context())
 
 	var req BlockRequest
-	if err := readJSON(r, &req); err != nil || req.JID == "" || req.Action == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "jid and action are required"})
+	if err := readJSON(w, r, &req); err != nil || req.JID == "" || req.Action == "" {
+		writeBadRequest(w, "jid and action are required")
 		return
 	}
 
 	if req.Action != "block" && req.Action != "unblock" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "action must be 'block' or 'unblock'"})
+		writeBadRequest(w, "action must be 'block' or 'unblock'")
 		return
 	}
 
 	waInst, ok := h.manager.Get(inst.Name)
 	if !ok {
-		writeJSON(w, http.StatusServiceUnavailable, ErrorResponse{Error: "instance not connected"})
+		writeNotConnected(w)
 		return
 	}
 
 	if err := waInst.UpdateBlocklist(r.Context(), req.JID, req.Action); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		h.writeInternalError(w, r, "failed to update blocklist", err)
 		return
 	}
 
@@ -171,7 +171,7 @@ func (h *Handlers) HandleListContacts(w http.ResponseWriter, r *http.Request) {
 
 	contacts, err := h.store.ListContacts(r.Context(), inst.ID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to list contacts"})
+		h.writeInternalError(w, r, "failed to list contacts", err)
 		return
 	}
 
@@ -184,13 +184,13 @@ func (h *Handlers) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
 
 	waInst, ok := h.manager.Get(inst.Name)
 	if !ok {
-		writeJSON(w, http.StatusServiceUnavailable, ErrorResponse{Error: "instance not connected"})
+		writeNotConnected(w)
 		return
 	}
 
 	profile, err := waInst.GetProfile(r.Context(), jid)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		h.writeInternalError(w, r, "failed to get profile", err)
 		return
 	}
 

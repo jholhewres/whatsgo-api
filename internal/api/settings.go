@@ -11,7 +11,7 @@ func (h *Handlers) HandleGetSettings(w http.ResponseWriter, r *http.Request) {
 
 	settings, err := h.store.GetInstanceSettings(r.Context(), inst.ID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get settings"})
+		h.writeInternalError(w, r, "failed to get settings", err)
 		return
 	}
 
@@ -22,14 +22,14 @@ func (h *Handlers) HandleUpdateSettings(w http.ResponseWriter, r *http.Request) 
 	inst := auth.GetInstance(r.Context())
 
 	var req UpdateSettingsRequest
-	if err := readJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+	if err := readJSON(w, r, &req); err != nil {
+		writeBadRequest(w, "invalid request body")
 		return
 	}
 
 	settings, err := h.store.GetInstanceSettings(r.Context(), inst.ID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get settings"})
+		h.writeInternalError(w, r, "failed to get settings", err)
 		return
 	}
 
@@ -56,7 +56,7 @@ func (h *Handlers) HandleUpdateSettings(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := h.store.UpsertInstanceSettings(r.Context(), settings); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to update settings"})
+		h.writeInternalError(w, r, "failed to update settings", err)
 		return
 	}
 

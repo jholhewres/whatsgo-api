@@ -24,14 +24,23 @@ type Dispatcher struct {
 
 // NewDispatcher creates a new webhook dispatcher.
 func NewDispatcher(s store.Store, cfg config.WebhookConfig, logger *slog.Logger) *Dispatcher {
+	timeout := cfg.Timeout
+	if timeout <= 0 {
+		timeout = 30
+	}
+	maxConcurrent := cfg.MaxConcurrent
+	if maxConcurrent <= 0 {
+		maxConcurrent = 50
+	}
+
 	return &Dispatcher{
 		store:     s,
 		globalCfg: cfg,
 		logger:    logger,
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: time.Duration(timeout) * time.Second,
 		},
-		sem: make(chan struct{}, 50), // max 50 concurrent dispatches
+		sem: make(chan struct{}, maxConcurrent),
 	}
 }
 
@@ -88,7 +97,10 @@ func (d *Dispatcher) send(ctx context.Context, url string, headers map[string]st
 		return
 	}
 
-	maxRetries := 5
+	maxRetries := d.globalCfg.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 5
+	}
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 		if err != nil {

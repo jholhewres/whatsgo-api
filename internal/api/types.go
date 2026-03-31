@@ -6,6 +6,7 @@ import "time"
 
 type ErrorResponse struct {
 	Error string `json:"error"`
+	Code  string `json:"code,omitempty"`
 }
 
 type SuccessResponse struct {

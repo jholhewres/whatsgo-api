@@ -18,11 +18,15 @@ type Middleware struct {
 }
 
 func NewMiddleware(s store.Store, globalKey string, logger *slog.Logger) *Middleware {
+	return NewMiddlewareWithTTL(s, globalKey, logger, 2*time.Minute)
+}
+
+func NewMiddlewareWithTTL(s store.Store, globalKey string, logger *slog.Logger, cacheTTL time.Duration) *Middleware {
 	return &Middleware{
 		store:         s,
 		globalKey:     globalKey,
 		logger:        logger,
-		instanceCache: cache.New[string, *store.Instance](2 * time.Minute),
+		instanceCache: cache.New[string, *store.Instance](cacheTTL),
 	}
 }
 

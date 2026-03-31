@@ -97,7 +97,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error":"internal server error"}`))
+		w.Write([]byte(`{"error":"internal server error","code":"MARSHAL_ERROR"}`))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -105,7 +105,23 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Write(data)
 }
 
-func readJSON(r *http.Request, v any) error {
-	r.Body = http.MaxBytesReader(nil, r.Body, maxRequestBody)
+func readJSON(w http.ResponseWriter, r *http.Request, v any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	return json.NewDecoder(r.Body).Decode(v)
+}
+
+// writeBadRequest returns a 400 with a user-facing message.
+func writeBadRequest(w http.ResponseWriter, msg string) {
+	writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: msg, Code: "BAD_REQUEST"})
+}
+
+// writeNotConnected returns a 503 for disconnected instances.
+func writeNotConnected(w http.ResponseWriter) {
+	writeJSON(w, http.StatusServiceUnavailable, ErrorResponse{Error: "instance not connected", Code: "NOT_CONNECTED"})
+}
+
+// writeInternalError logs the real error and returns a generic message to the client.
+func (h *Handlers) writeInternalError(w http.ResponseWriter, r *http.Request, msg string, err error) {
+	h.logger.Error(msg, "error", err, "method", r.Method, "path", r.URL.Path)
+	writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: msg, Code: "INTERNAL_ERROR"})
 }

@@ -14,14 +14,14 @@ func (h *Handlers) HandleSetWebhook(w http.ResponseWriter, r *http.Request) {
 	inst := auth.GetInstance(r.Context())
 
 	var req SetWebhookRequest
-	if err := readJSON(r, &req); err != nil || req.URL == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "url is required"})
+	if err := readJSON(w, r, &req); err != nil || req.URL == "" {
+		writeBadRequest(w, "url is required")
 		return
 	}
 
 	existing, err := h.store.GetWebhookByInstance(r.Context(), inst.ID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to check webhook"})
+		h.writeInternalError(w, r, "failed to check webhook", err)
 		return
 	}
 
@@ -31,7 +31,7 @@ func (h *Handlers) HandleSetWebhook(w http.ResponseWriter, r *http.Request) {
 		existing.Headers = req.Headers
 		existing.Enabled = req.Enabled
 		if err := h.store.UpdateWebhook(r.Context(), existing); err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to update webhook"})
+			h.writeInternalError(w, r, "failed to update webhook", err)
 			return
 		}
 		writeJSON(w, http.StatusOK, existing)
@@ -48,7 +48,7 @@ func (h *Handlers) HandleSetWebhook(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:  time.Now(),
 	}
 	if err := h.store.CreateWebhook(r.Context(), wh); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to create webhook"})
+		h.writeInternalError(w, r, "failed to create webhook", err)
 		return
 	}
 
@@ -60,11 +60,11 @@ func (h *Handlers) HandleGetWebhook(w http.ResponseWriter, r *http.Request) {
 
 	wh, err := h.store.GetWebhookByInstance(r.Context(), inst.ID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get webhook"})
+		h.writeInternalError(w, r, "failed to get webhook", err)
 		return
 	}
 	if wh == nil {
-		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "no webhook configured"})
+		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "no webhook configured", Code: "NOT_FOUND"})
 		return
 	}
 
@@ -75,7 +75,7 @@ func (h *Handlers) HandleDeleteWebhook(w http.ResponseWriter, r *http.Request) {
 	inst := auth.GetInstance(r.Context())
 
 	if err := h.store.DeleteWebhook(r.Context(), inst.ID); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to delete webhook"})
+		h.writeInternalError(w, r, "failed to delete webhook", err)
 		return
 	}
 

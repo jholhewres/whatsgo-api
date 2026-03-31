@@ -1,6 +1,9 @@
 package server
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -8,17 +11,58 @@ import (
 	"time"
 )
 
+type contextKey string
+
+const requestIDKey contextKey = "request_id"
+
+// RequestID returns the request ID from context, or empty string.
+func RequestID(ctx context.Context) string {
+	if id, ok := ctx.Value(requestIDKey).(string); ok {
+		return id
+	}
+	return ""
+}
+
+func generateRequestID() string {
+	b := make([]byte, 8)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func requestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := r.Header.Get("X-Request-ID")
+		if id == "" || len(id) > 64 {
+			id = generateRequestID()
+		}
+		ctx := context.WithValue(r.Context(), requestIDKey, id)
+		w.Header().Set("X-Request-ID", id)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func loggingMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 		next.ServeHTTP(rw, r)
-		logger.Info("request",
+
+		level := slog.LevelInfo
+		if rw.statusCode >= 500 {
+			level = slog.LevelError
+		} else if rw.statusCode >= 400 {
+			level = slog.LevelWarn
+		}
+
+		logger.Log(r.Context(), level, "request",
+			"request_id", RequestID(r.Context()),
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", rw.statusCode,
-			"duration", time.Since(start).String(),
+			"duration_ms", time.Since(start).Milliseconds(),
+			"bytes", rw.bytesWritten,
 			"remote", r.RemoteAddr,
+			"user_agent", r.UserAgent(),
 		)
 	})
 }
@@ -70,7 +114,9 @@ func recoveryMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				logger.Error("panic recovered", "error", err, "path", r.URL.Path)
-				http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"error":"internal server error"}`))
 			}
 		}()
 		next.ServeHTTP(w, r)
@@ -79,10 +125,17 @@ func recoveryMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
 
 type responseWriter struct {
 	http.ResponseWriter
-	statusCode int
+	statusCode   int
+	bytesWritten int
 }
 
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
+}
+
+func (rw *responseWriter) Write(b []byte) (int, error) {
+	n, err := rw.ResponseWriter.Write(b)
+	rw.bytesWritten += n
+	return n, err
 }

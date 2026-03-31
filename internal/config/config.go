@@ -22,9 +22,12 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Host    string `yaml:"host"`
-	Port    int    `yaml:"port"`
-	BaseURL string `yaml:"base_url"`
+	Host         string `yaml:"host"`
+	Port         int    `yaml:"port"`
+	BaseURL      string `yaml:"base_url"`
+	ReadTimeout  int    `yaml:"read_timeout"`  // seconds
+	WriteTimeout int    `yaml:"write_timeout"` // seconds
+	IdleTimeout  int    `yaml:"idle_timeout"`  // seconds
 }
 
 type DatabaseConfig struct {
@@ -61,6 +64,7 @@ type SQLiteConfig struct {
 
 type AuthConfig struct {
 	GlobalAPIKey string `yaml:"global_api_key"`
+	CacheTTL     int    `yaml:"cache_ttl"` // seconds, default 120
 }
 
 type WhatsAppConfig struct {
@@ -68,9 +72,12 @@ type WhatsAppConfig struct {
 }
 
 type WebhookConfig struct {
-	GlobalURL     string            `yaml:"global_url"`
-	GlobalEvents  []string          `yaml:"global_events"`
-	GlobalHeaders map[string]string `yaml:"global_headers"`
+	GlobalURL      string            `yaml:"global_url"`
+	GlobalEvents   []string          `yaml:"global_events"`
+	GlobalHeaders  map[string]string `yaml:"global_headers"`
+	Timeout        int               `yaml:"timeout"`         // seconds, default 30
+	MaxConcurrent  int               `yaml:"max_concurrent"`  // default 50
+	MaxRetries     int               `yaml:"max_retries"`     // default 5
 }
 
 type LoggingConfig struct {
@@ -81,9 +88,12 @@ type LoggingConfig struct {
 func Default() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Host:    "0.0.0.0",
-			Port:    8550,
-			BaseURL: "http://localhost:8550",
+			Host:         "0.0.0.0",
+			Port:         8550,
+			BaseURL:      "http://localhost:8550",
+			ReadTimeout:  15,
+			WriteTimeout: 60,
+			IdleTimeout:  120,
 		},
 		Database: DatabaseConfig{
 			Backend: "postgresql",
@@ -101,8 +111,16 @@ func Default() *Config {
 				Path: "./data/whatsgo.db",
 			},
 		},
+		Auth: AuthConfig{
+			CacheTTL: 120,
+		},
 		WhatsApp: WhatsAppConfig{
 			SessionDBPath: "./data/sessions.db",
+		},
+		Webhook: WebhookConfig{
+			Timeout:       30,
+			MaxConcurrent: 50,
+			MaxRetries:    5,
 		},
 		Logging: LoggingConfig{
 			Level:  "info",
