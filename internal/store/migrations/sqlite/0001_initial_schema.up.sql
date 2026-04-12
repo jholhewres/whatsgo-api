@@ -72,7 +72,5 @@ CREATE TABLE chats (
 );
 CREATE INDEX idx_chats_instance ON chats(instance_id);
 
-CREATE TABLE schema_migrations (
-    version    TEXT PRIMARY KEY,
-    applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+-- schema_migrations is created by the migrator itself (with IF NOT EXISTS)
+-- DO NOT create it here to avoid "already exists" errors on restart
